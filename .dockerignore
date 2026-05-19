@@ -1,0 +1,13 @@
+#Ignore everything that Docker doesn't need to build the image.
+#smaller build context = faster docker build.
+
+target/
+.git/
+.github/
+*.md
+.gitignore
+.dockerignore
+k8s/
+.idea/
+*.iml
+
