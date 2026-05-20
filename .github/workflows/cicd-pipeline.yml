@@ -93,8 +93,7 @@ jobs:
               ${{ env.IMAGE_NAME }}:latest
             # Build cache — dramatically speeds up subsequent builds
             # Uses Docker Hub registry as cache storage
-            cache-from: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache
-            cache-to: type=registry,ref=${{ env.IMAGE_NAME }}:buildcache,mode=max
+
 
             # Output the exact image name for debugging and traceability
       - name: Image summary
