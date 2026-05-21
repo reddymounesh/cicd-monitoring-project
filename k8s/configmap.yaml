@@ -1,0 +1,17 @@
+# ConfigMap: non-sensitive configuration injected into pods as env vars or files.
+# Why ConfigMap? Decouple config from the container image.
+# Change config without rebuilding the image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cicdapp-config
+  namespace: default
+  labels:
+    app: cicdapp
+data:
+  # These become environment variables in the pod
+  APP_VERSION: "1.0.0"
+  SPRING_PROFILES_ACTIVE: "kubernetes"
+  # Application-level config
+  LOG_LEVEL: "INFO"
+  SERVER_PORT: "8080"

@@ -1,0 +1,26 @@
+# ServiceMonitor: tells Prometheus Operator which services to scrape
+# More precise than pod annotations — works at Service level
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cicdapp-monitor
+  namespace: monitoring  # Must be in monitoring namespace where Prometheus is
+  labels:
+    # This label must match what prometheus-stack watches for
+    release: prometheus-stack
+spec:
+  # Which namespaces to look for the Service in
+  namespaceSelector:
+    matchNames:
+      - default
+
+  # Which Services to monitor (by label)
+  selector:
+    matchLabels:
+      app: cicdapp
+
+  endpoints:
+    - port: http       # Must match the port name in Service
+      path: /actuator/prometheus
+      interval: 15s   # Scrape every 15 seconds
+      scheme: http

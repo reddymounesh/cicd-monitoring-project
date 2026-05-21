@@ -1,0 +1,29 @@
+# Service: stable network endpoint for a set of pods.
+# Pods come and go (new IPs each time) — Service gives a stable DNS name.
+# DNS: cicdapp-service.default.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: cicdapp-service
+  namespace: default
+  labels:
+    app: cicdapp
+spec:
+  # NodePort: accessible from outside the cluster via <NodeIP>:<NodePort>
+  # Alternatives:
+  #   ClusterIP: only inside the cluster (use for internal services)
+  #   LoadBalancer: creates a cloud load balancer (AWS ELB, GCP NLB)
+  #   NodePort: use for local development and Minikube
+  type: NodePort
+
+  # Route traffic to pods with this label
+  selector:
+    app: cicdapp  # Must match pod template labels in Deployment
+
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80          # Port on the Service (inside cluster)
+      targetPort: 8080  # Port on the Pod (must match containerPort)
+      nodePort: 30080   # Port on the Node (30000-32767 range)
+      # Access URL in Minikube: http://<minikube-ip>:30080

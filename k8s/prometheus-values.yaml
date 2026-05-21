@@ -1,0 +1,77 @@
+prometheus:
+  prometheusSpec:
+    retention: 15d
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
+
+
+    scrapeInterval: 15s
+
+    serviceMonitorSelectorNilUsesHelmValues: false
+
+    additionalScrapeConfigs:
+      - job_name: 'spring-boot-app'
+        kubernetes_sd_configs:
+          - role: pod
+
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: $1
+
+          - source_labels: [ __meta_kubernetes_pod_annotation_prometheus_io_path ]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+                # Add pod name as a label on every metric
+          - source_labels: [ __meta_kubernetes_pod_name ]
+            target_label: pod
+                # Add namespace as a label
+          - source_labels: [ __meta_kubernetes_namespace ]
+
+            target_label: namespace
+
+alertmanager:
+  alertmanagerSpec:
+    storage:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 2Gi
+
+
+grafana:
+  adminPassword: "admin123"
+
+  persistance:
+    enabled: true
+    size: 5Gi
+
+  additionalDatasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-operated:9090
+      isDefault: true
+
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true
+
+

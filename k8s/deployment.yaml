@@ -1,0 +1,112 @@
+# Deployment: manages a ReplicaSet which manages Pods.
+# Deployment → ReplicaSet → Pod(s)
+# ReplicaSet ensures the desired number of pod replicas are running.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cicdapp-deployment
+  namespace: default
+  labels:
+    app: cicdapp
+    version: "1.0.0"
+spec:
+  # Number of pod replicas to run
+  # In production: minimum 2 for zero-downtime (rolling update keeps 1 always running)
+  replicas: 2
+
+  # Selector tells Deployment which pods belong to it
+  # Must match template.metadata.labels
+  selector:
+    matchLabels:
+      app: cicdapp
+
+  # Rolling Update Strategy — how new versions are deployed
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Maximum pods that can be unavailable during update
+      # 1 means: with 2 replicas, minimum 1 is always running
+      maxUnavailable: 1
+      # Maximum pods that can be created above desired count during update
+      # 1 means: temporarily run 3 pods (2 + 1) during rollout
+      maxSurge: 1
+
+  template:
+    metadata:
+      # These labels are used by the selector above AND by the Service
+      labels:
+        app: cicdapp
+        version: "1.0.0"
+
+    spec:
+      containers:
+        - name: cicdapp
+          # Replace YOUR_DOCKERHUB_USERNAME with yours
+          # In CI/CD: this would be updated by the pipeline with the commit SHA
+          image: mzoro15/cicd-monitoring-app:latest
+          imagePullPolicy: Always  # Always pull latest (never use cached in production)
+
+          ports:
+            - containerPort: 8080  # Port the app listens on inside the container
+
+          # Resource requests and limits — CRITICAL for production
+          resources:
+            requests:
+              # Guaranteed resources — scheduler uses this for placement
+              memory: "256Mi"   # 256 MiB RAM minimum
+              cpu: "250m"       # 250 millicores = 0.25 CPU cores
+            limits:
+              # Maximum allowed — pod is killed if it exceeds memory limit
+              memory: "512Mi"   # 512 MiB RAM maximum
+              cpu: "500m"       # 500 millicores = 0.5 CPU cores
+
+          # Environment variables from ConfigMap
+          envFrom:
+            - configMapRef:
+                name: cicdapp-config
+            - secretRef:
+                name: cicdapp-secret
+
+          # Additional individual env vars
+          env:
+            - name: JAVA_OPTS
+              value: "-Xms256m -Xmx512m"
+            # Expose pod metadata to the app (useful for logging)
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+
+          # ===== LIVENESS PROBE =====
+          # Answers: "Is the container ALIVE or should Kubernetes restart it?"
+          # If this fails: container is RESTARTED
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8080
+            initialDelaySeconds: 60  # Wait 60s before first check (JVM startup time)
+            periodSeconds: 30         # Check every 30s
+            timeoutSeconds: 10        # Fail if no response in 10s
+            failureThreshold: 3       # Restart after 3 consecutive failures
+
+          # ===== READINESS PROBE =====
+          # Answers: "Is the container READY to receive traffic?"
+          # If this fails: pod is removed from Service endpoints (no traffic sent)
+          # Pod is NOT restarted — just traffic-gated
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8080
+            initialDelaySeconds: 30   # Start checking after 30s
+            periodSeconds: 10         # Check every 10s
+            timeoutSeconds: 5
+            failureThreshold: 3
+            successThreshold: 1       # One success brings it back online
+
+      # Graceful shutdown: Kubernetes sends SIGTERM, waits this many seconds, then SIGKILL
+      # Ensure your app handles SIGTERM gracefully (Spring Boot does by default)
+      terminationGracePeriodSeconds: 30

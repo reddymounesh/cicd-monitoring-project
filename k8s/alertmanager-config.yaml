@@ -1,0 +1,85 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+
+metadata:
+  name: cicdapp-alertconfig
+  namespace: monitoring
+  labels:
+    alertmanagerConfig: prometheus-stack
+
+spec:
+  route:
+    receiver: default-receiver
+    groupBy:
+      - alertname
+      - namespace
+
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+
+    routes:
+      - matchers:
+          - name: severity
+            value: critical
+        receiver: slack-critical
+        groupWait: 10s
+        repeatInterval: 1h
+
+      - matchers:
+          - name: severity
+            value: warning
+        receiver: slack-warnings
+        repeatInterval: 6h
+
+  receivers:
+    - name: default-receiver
+
+    - name: slack-critical
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-secrets
+            key: slack-webhook-url
+
+          channel: "#alerts-critical"
+          sendResolved: true
+
+          title: "🚨 Critical Alert"
+
+          text: |
+            *Alert:* {{ .CommonAnnotations.summary }}
+            *Severity:* {{ .CommonLabels.severity }}
+            *Namespace:* {{ .CommonLabels.namespace }}
+            *Pod:* {{ .CommonLabels.pod }}
+            *Description:* {{ .CommonAnnotations.description }}
+
+    - name: slack-warnings
+      slackConfigs:
+        - apiURL:
+            name: alertmanager-secrets
+            key: slack-webhook-url
+
+          channel: "#alerts-warnings"
+          sendResolved: true
+
+          title: "⚠️ Warning Alert"
+
+          text: |
+            *Alert:* {{ .CommonAnnotations.summary }}
+            *Severity:* {{ .CommonLabels.severity }}
+            *Namespace:* {{ .CommonLabels.namespace }}
+            *Description:* {{ .CommonAnnotations.description }}
+
+  inhibitRules:
+    - sourceMatch:
+        - name: alertname
+          value: ApplicationDown
+          matchType: "="
+
+      targetMatch:
+        - name: alertname
+          value: HighCpuUsage
+          matchType: "="
+
+      equal:
+        - instance
